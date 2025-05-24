@@ -1,0 +1,344 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle de Gastos</title>
+  <style>
+     
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f3f3f3;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 500px;
+  background: white;
+  padding: 20px;
+  margin: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+input, select, button {
+  padding: 10px;
+  font-size: 1rem;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #eee;
+  display: flex;
+  justify-content: space-between;
+  border-radius: 4px;
+}
+
+    
+  </style>
+</head>
+<body>
+   <div class="container">
+    <h1>Controle de Gastos</h1>
+    
+    <form id="form">
+      <input type="text" id="descricao" placeholder="Descrição" required />
+      <input type="number" id="valor" placeholder="Valor (R$)" required />
+      <select id="tipo">
+        <option value="receita">Receita</option>
+        <option value="despesa">Despesa</option>
+      </select>
+      <button onclick="removerTransacao()" type="submit">Adicionar</button>
+    </form>
+
+    <h2>Resumo</h2>
+    <p><strong>Saldo atual:</strong> R$ <span id="saldo">0.00</span></p>
+
+    <ul id="lista-gastos"></ul>
+  </div>
+
+  <script>
+    // --------------------------------------------------------------------------------------
+    // Explicação básica dos conceitos usados:
+    //
+    // 1. Elementos HTML são acessados pelo JavaScript para manipular o conteúdo da página.
+    //    Usamos document.getElementById("id") para pegar o elemento com o id específico.
+    //
+    // 2. Variáveis armazenam dados na memória temporária do navegador.
+    //
+    // 3. Funções são blocos de código que executam tarefas específicas e podem ser chamadas quando quiser.
+    //
+    // 4. Eventos são ações do usuário, como clicar num botão, que disparam funções.
+    //
+    // 5. Arrays são listas de dados.
+    //
+    // 6. Objetos são estruturas que guardam dados em pares de chave:valor.
+    //
+    // 7. LocalStorage é uma memória que o navegador oferece para guardar dados mesmo após fechar a página,
+    //    mas só guarda texto (strings). Por isso, usamos JSON para transformar objetos em texto e vice-versa.
+    // --------------------------------------------------------------------------------------
+
+
+
+    // 1. Seleção de elementos do HTML pelo ID
+const form = document.getElementById("form"); // Pega o elemento <form> com ID "form" no HTML
+const lista = document.getElementById("lista-gastos"); // Pega a <ul> com ID "lista-gastos" onde as transações (gastos/receitas) serão listadas
+const saldo = document.getElementById("saldo"); // Pega o <span> com ID "saldo", onde será mostrado o valor total calculado
+
+// Explicações detalhadas:
+// document.getElementById("id"): Esse método retorna uma referência ao elemento do HTML que tem o atributo id igual ao valor passado. Aqui usamos isso para poder manipular esses elementos com JavaScript, como adicionar conteúdo, pegar valores e alterar o visual.
+// const: é uma declaração de variável que não pode ser reatribuída. Ou seja, uma vez que a variável é definida, seu valor não pode ser sobrescrito (no caso de objetos, a referência é fixa, mas o conteúdo interno pode mudar).
+
+
+// 2. Carrega transações salvas do localStorage (memória do navegador)
+let transacoes = JSON.parse(localStorage.getItem("transacoes")) || []; // Tenta carregar os dados salvos, senão usa array vazio
+
+// Explicações detalhadas:
+// localStorage: é um objeto global do navegador que permite armazenar dados em forma de texto, que permanecem salvos mesmo depois de fechar a aba ou navegador.
+// localStorage.getItem("transacoes"): tenta buscar o valor associado à chave "transacoes". Se não houver nada salvo, retorna null.
+// JSON.parse(...): converte um texto em formato JSON (string) para um objeto ou array utilizável em JavaScript.
+// || []: operador lógico OU. Se o valor à esquerda for null ou undefined, o da direita (array vazio) será usado como valor padrão.
+
+
+// 3. Atualiza o saldo com base nas transações
+function atualizarSaldo() {
+  const total = transacoes.reduce((acc, t) => {
+    return t.tipo === "receita" ? acc + t.valor : acc - t.valor;
+  }, 0);
+
+  saldo.textContent = total.toFixed(2);
+}
+
+// Explicações detalhadas:
+// function atualizarSaldo(): define uma função que será chamada para calcular e atualizar o saldo total.
+// transacoes.reduce(...): reduce é um método de array que acumula valores. Ele recebe uma função callback com dois parâmetros: um acumulador (acc) e o item atual (t), e retorna um único valor final. O segundo argumento (0) é o valor inicial do acumulador.
+// t.tipo === "receita" ? acc + t.valor : acc - t.valor: Isso é um operador ternário (condicional). Se a transação for "receita", somamos o valor. Caso contrário ("despesa"), subtraímos.
+// saldo.textContent = ...: textContent é uma propriedade que define o texto visível dentro do elemento HTML. Aqui usamos ela para mostrar o saldo atualizado.
+// toFixed(2): converte o número para uma string com exatamente 2 casas decimais. Isso garante que o valor apareça como dinheiro, por exemplo: 10.00 ou 12.50.
+
+
+// 4. Salva as transações no navegador
+function salvarTransacoes() {
+  localStorage.setItem("transacoes", JSON.stringify(transacoes));
+}
+
+// Explicações detalhadas:
+// JSON.stringify(...): transforma um objeto ou array em uma string JSON. Isso é necessário porque o localStorage só consegue armazenar strings.
+// localStorage.setItem(chave, valor): salva um par chave-valor no armazenamento local. Aqui, estamos salvando o array de transações com a chave "transacoes".
+
+
+// 5. Adiciona uma transação na lista HTML (DOM)
+function adicionarTransacaoDOM(transacao) {
+  const li = document.createElement("li"); // Cria um novo elemento <li> (item de lista)
+
+  li.innerHTML = `
+    ${transacao.descricao} - R$ ${transacao.valor.toFixed(2)}
+    <button onclick="removerTransacao('${transacao.id}')">X</button>
+  `;
+
+  lista.appendChild(li); // Adiciona esse <li> dentro da <ul> no HTML
+}
+
+// Explicações detalhadas:
+// document.createElement("li"): cria dinamicamente um novo elemento de lista no DOM.
+// li.innerHTML = ...: usamos template literals (entre crases) para montar um HTML personalizado com variáveis.
+// ${...}: dentro de template strings, permite inserir expressões JavaScript dentro do texto.
+// .toFixed(2): garante que o valor monetário tenha 2 casas decimais.
+// onclick="removerTransacao(...)": define um evento inline no botão, chamando a função removerTransacao com o ID da transação a ser removida.
+// appendChild(...): insere o novo elemento criado (li) dentro de outro elemento pai (ul com ID "lista-gastos").
+
+
+// 6. Remove uma transação pelo ID
+function removerTransacao(id) {
+  transacoes = transacoes.filter(t => t.id !== id); // Cria um novo array sem a transação que tem esse ID
+
+  salvarTransacoes(); // Salva o novo array no localStorage
+  renderizar();       // Atualiza visualmente a lista e o saldo
+}
+
+// Explicações detalhadas:
+// .filter(): método que retorna um novo array contendo apenas os elementos que satisfazem a condição.
+// t => t.id !== id: função arrow (função anônima de uma linha). Mantém todos os elementos cujo id é diferente do que foi clicado.
+// !==: operador de comparação "diferente estrito" — compara valor e tipo.
+// Depois de atualizar o array, chamamos salvarTransacoes() para guardar as mudanças e renderizar() para atualizar a interface.
+
+
+// 7. Atualiza toda a interface: limpa e mostra os dados
+function renderizar() {
+  lista.innerHTML = ""; // Apaga todo o conteúdo da <ul> (limpa a lista visual)
+
+  transacoes.forEach(adicionarTransacaoDOM); // Para cada transação, chama a função que adiciona ela no HTML
+  atualizarSaldo(); // Recalcula e exibe o novo saldo
+}
+
+// Explicações detalhadas:
+// innerHTML = "": apaga o conteúdo HTML interno de um elemento (aqui, da lista de transações).
+// forEach(...): método de array que executa uma função para cada item do array. Nesse caso, estamos reapresentando cada transação no DOM.
+
+
+// 8. Evento que escuta o envio do formulário
+form.addEventListener("submit", function (e) {
+  e.preventDefault(); // Evita que a página seja recarregada ao enviar o formulário
+
+  const descricao = document.getElementById("descricao").value; // Pega o valor do campo "descricao"
+  const valor = parseFloat(document.getElementById("valor").value); // Pega o valor numérico e converte para float
+  const tipo = document.getElementById("tipo").value; // Pega o valor selecionado ("receita" ou "despesa")
+
+  const nova = {
+    id: Date.now().toString(), // Gera um ID único com base no tempo atual
+    descricao,                // Descrição digitada pelo usuário
+    valor,                    // Valor convertido
+    tipo                      // Tipo de transação
+  };
+
+  transacoes.push(nova);       // Adiciona a nova transação no array
+  salvarTransacoes();          // Salva no localStorage
+  renderizar();                // Atualiza a interface
+  form.reset();                // Limpa o formulário para novos dados
+});
+
+// Explicações detalhadas:
+// form.addEventListener("submit", ...): escuta quando o formulário é enviado.
+// e.preventDefault(): impede o comportamento padrão do formulário (recarregar a página).
+// .value: acessa o valor digitado/selecionado pelo usuário em um input.
+// parseFloat(): converte uma string para um número decimal (float).
+// Date.now(): retorna a quantidade de milissegundos desde 01/01/1970 — garante um número único.
+// .toString(): converte esse número para string, para usarmos como ID.
+// form.reset(): limpa todos os campos do formulário, deixando-o pronto para novo uso.
+
+  
+// 9. Inicializa a página com os dados salvos
+renderizar(); // Chama a função para carregar os dados salvos ao abrir a página
+
+// Explicações detalhadas:
+// Ao carregar a página, chamamos renderizar() para garantir que todas as transações que estavam salvas apareçam automaticamente. Também garante que o saldo seja calculado corretamente desde o início.
+
+
+// FIM DO SCRIPT AINDA MAIS COMENTADO E DETALHADO
+
+
+
+
+
+
+
+/*
+// Seleciona elementos do HTML e armazena em variáveis
+const form = document.getElementById("form"); // Formulário de entrada
+const lista = document.getElementById("lista-gastos"); // Lista de gastos
+const saldo = document.getElementById("saldo"); // Elemento que mostra o saldo atual
+
+// Carrega os dados salvos anteriormente do navegador (localStorage), ou começa com um array vazio
+let transacoes = JSON.parse(localStorage.getItem("transacoes")) || [];
+// Aqui usamos JSON.parse para transformar o texto salvo em um array de verdade
+// localStorage.getItem() busca o que foi salvo usando a chave "transacoes"
+// Se não encontrar nada, usamos || [] para iniciar um array vazio
+
+// Função para atualizar o saldo total
+function atualizarSaldo() {
+  // A função reduce() percorre todas as transações e acumula os valores
+  const total = transacoes.reduce((acc, t) => {
+    // Se for receita, somamos; se for despesa, subtraímos
+    return t.tipo === "receita" ? acc + t.valor : acc - t.valor;
+  }, 0); // Começamos a conta com 0
+
+  // Exibe o saldo com 2 casas decimais
+  saldo.textContent = total.toFixed(2);
+}
+
+// Função que salva as transações no navegador
+function salvarTransacoes() {
+  // JSON.stringify transforma o array em texto para ser salvo
+  localStorage.setItem("transacoes", JSON.stringify(transacoes));
+}
+
+// Adiciona visualmente uma nova transação na lista (HTML)
+function adicionarTransacaoDOM(transacao) {
+  const li = document.createElement("li"); // Cria um novo <li>
+
+  // Define o conteúdo do item da lista
+  li.innerHTML = `
+    ${transacao.descricao} - R$ ${transacao.valor.toFixed(2)}
+    <button onclick="removerTransacao('${transacao.id}')">X</button>
+  `;
+  // O botão chama a função removerTransacao e envia o id da transação como argumento
+
+  lista.appendChild(li); // Adiciona esse <li> na lista do HTML
+}
+
+// Remove uma transação do array usando o ID
+function removerTransacao(id) {
+  // Filtra o array, removendo a transação com o ID informado
+  transacoes = transacoes.filter(t => t.id !== id);
+
+  // Atualiza o localStorage
+  salvarTransacoes();
+
+  // Reexibe tudo na tela
+  renderizar();
+}
+
+// Função que limpa a lista e exibe todas as transações novamente
+function renderizar() {
+  lista.innerHTML = ""; // Limpa tudo na lista antes
+
+  // Para cada transação, cria e adiciona um <li> na tela
+  transacoes.forEach(adicionarTransacaoDOM);
+
+  // Atualiza o saldo total
+  atualizarSaldo();
+}
+
+// Evento que escuta o envio do formulário
+form.addEventListener("submit", function (e) {
+  e.preventDefault(); // Impede o recarregamento da página
+
+  // Pega os valores digitados pelo usuário
+  const descricao = document.getElementById("descricao").value;
+  const valor = parseFloat(document.getElementById("valor").value); // Converte texto para número decimal
+  const tipo = document.getElementById("tipo").value;
+
+  // Cria um novo objeto representando a transação
+  const nova = {
+    id: Date.now().toString(), // Gera um ID único com base na hora atual
+    descricao, // mesmo que: descricao: descricao
+    valor,
+    tipo
+  };
+
+  // Adiciona a nova transação no array
+  transacoes.push(nova);
+
+  // Salva no localStorage
+  salvarTransacoes();
+
+  // Atualiza a tela
+  renderizar();
+
+  // Limpa os campos do formulário
+  form.reset();
+});
+
+// Primeira renderização ao carregar a página
+renderizar();
+ */
+
+  </script>
+</body>
+</html>
+
